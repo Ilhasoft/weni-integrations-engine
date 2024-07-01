@@ -28,7 +28,6 @@ from marketplace.services.product.product_facebook_manage import ProductFacebook
 from marketplace.services.vtex.exceptions import (
     UnexpectedFacebookApiResponseValidationError,
 )
-from marketplace.services.facebook.exceptions import FileNotSendValidationError
 from marketplace.services.vtex.app_manager import AppVtexManager
 
 
@@ -115,84 +114,58 @@ class ProductInsertionService(VtexServiceBase):
         catalog: Catalog,
         sellers: Optional[List[str]] = None,
     ):
+        has_product_feed = self._check_if_feed_exists(catalog=catalog)
+
+        if has_product_feed:
+            print("There is already a feed created, to continue there must be no feeds")
+            return
+
         pvt_service = self.get_private_service(
             credentials.app_key, credentials.app_token
         )
-        products = pvt_service.list_all_products(
+        products_dto = pvt_service.list_all_products(
             credentials.domain, catalog.vtex_app.config, sellers
         )
-        if not products:
+        if not products_dto:
             return None
 
-        close_old_connections()
-        # TODO: --BEGIN: This block needs to be removed--
-        products_csv = pvt_service.data_processor.products_to_csv(products)
-        close_old_connections()
-        self._send_products_to_facebook(products_csv, catalog)
-        pvt_service.data_processor.clear_csv_buffer(
-            products_csv
-        )  # frees the memory of the csv file
-        # TODO: --END: This block needs to be removed--
+        product_feed = self._create_product_feed()
 
-        # TODO: --BEGIN: This block will replace the block above--
-        # all_success = self.product_manager.save_first_csv_product_data(
-        #     products, catalog, product_feed,pvt_service.data_processor
-        # )
-        # if not all_success:
-        #     raise Exception(
-        #         f"Error on save first csv on database. Catalog:{self.catalog.facebook_catalog_id}"
-        #     )
-        # TODO --END: This block will replace the block above-
         close_old_connections()
+        all_success = self.product_manager.bulk_save_csv_product_data(
+            products_dto, self.catalog, product_feed, pvt_service.data_processor
+        )
+
+        # TODO: move this code to the task that will upload to meta
         self.app_manager.initial_sync_products_completed(catalog.vtex_app)
 
-        return products
+        return all_success
 
-    # TODO: This method needs to be removed after replacement--
-    def _send_products_to_facebook(self, products_csv, catalog: Catalog):
-        print("Starting to upload the CSV file to Facebook")
+    def _check_if_feed_exists(self, catalog: Catalog) -> bool:
+        print("check if feed exists")
+        service = self.fb_service(catalog.app)
+        response = service.get_product_feed_by_catalog(catalog.facebook_catalog_id)
+        return response
+
+    def _create_product_feed(self) -> ProductFeed:
+        print("Creating the product feed")
         current_time = datetime.now().strftime("%Y-%m-%d_%H-%M")
         file_name = f"csv_vtex_products_{current_time}.csv"
-        product_feed = self._create_product_feed(file_name, catalog)
-        self._upload_product_feed(
-            catalog.app,
-            product_feed.facebook_feed_id,
-            products_csv,
-            file_name,
+        service = self.fb_service(self.catalog.app)
+        response = service.create_product_feed(
+            self.catalog.facebook_catalog_id, file_name
         )
-        print("Uploading the CSV file to Facebook completed successfully")
-        return product_feed
-
-    # TODO: This method needs to be removed after replacement--
-    def _create_product_feed(self, name, catalog: Catalog) -> ProductFeed:
-        print("Creating the product feed")
-        service = self.fb_service(catalog.app)
-        response = service.create_product_feed(catalog.facebook_catalog_id, name)
 
         if "id" not in response:
             raise UnexpectedFacebookApiResponseValidationError()
 
         product_feed = ProductFeed.objects.create(
             facebook_feed_id=response["id"],
-            name=name,
-            catalog=catalog,
-            created_by=catalog.created_by,
+            name=file_name,
+            catalog=self.catalog,
+            created_by=self.catalog.created_by,
         )
         return product_feed
-
-    # TODO: This method needs to be removed after replacement--
-    def _upload_product_feed(
-        self, app, product_feed_id, csv_file, file_name, update_only=False
-    ):
-        print("Uploading the product feed to facebook")
-        service = self.fb_service(app)
-        response = service.upload_product_feed(
-            product_feed_id, csv_file, file_name, "text/csv", update_only
-        )
-        if "id" not in response:
-            raise FileNotSendValidationError()
-
-        return True
 
 
 class ProductUpdateService(VtexServiceBase):

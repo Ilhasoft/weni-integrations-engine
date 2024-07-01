@@ -30,7 +30,10 @@ from marketplace.applications.models import App
 
 from django_redis import get_redis_connection
 
-from marketplace.wpp_products.utils import ProductUploader
+from marketplace.wpp_products.utils import (
+    FirstSyncProductUploader,
+    ProductUpdateUploader,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -141,12 +144,6 @@ def task_insert_vtex_products(**kwargs):
         return
 
     try:
-        # Reset queries and close old connections for a clean state and performance.
-        # Prevents memory leak from stored queries and unstable database connections
-        # before further operations.
-        reset_queries()
-        close_old_connections()
-
         catalog = Catalog.objects.get(uuid=catalog_uuid)
         api_credentials = APICredentials(
             app_key=credentials["app_key"],
@@ -158,6 +155,12 @@ def task_insert_vtex_products(**kwargs):
         if products is None:
             print("There are no products to be shipped after processing the rules")
             return
+
+        celery_app.send_task(
+            "task_upload_vtex_products",
+            kwargs={"app_vtex_uuid": str(catalog.vtex_app.uuid), "first_sync": True},
+            queue="vtex-product-upload",
+        )
 
     except Exception as e:
         logger.exception(
@@ -289,12 +292,14 @@ def task_forward_vtex_webhook(**kwargs):
 @celery_app.task(name="task_upload_vtex_products")
 def task_upload_vtex_products(**kwargs):
     app_vtex_uuid = kwargs.get("app_vtex_uuid")
+    first_sync = kwargs.get("first_sync", False)  # Flag to identify the first sync
+
     app_vtex = App.objects.get(uuid=app_vtex_uuid)
+
     redis_client = get_redis_connection()
     lock_key = f"upload_lock:{app_vtex_uuid}"
     lock_expiration_time = 15 * 60  # 15 minutes
 
-    # Attempt to acquire the lock
     if redis_client.set(lock_key, "locked", nx=True, ex=lock_expiration_time):
         try:
             catalogs = app_vtex.vtex_catalogs.all()
@@ -305,13 +310,15 @@ def task_upload_vtex_products(**kwargs):
             for catalog in catalogs:
                 if catalog.feeds.first():
                     print(f"Processing upload for catalog: {catalog.name}")
-                    uploader = ProductUploader(catalog=catalog)
+                    if first_sync:
+                        uploader = FirstSyncProductUploader(catalog=catalog)
+                    else:
+                        uploader = ProductUpdateUploader(catalog=catalog)
                     uploader.process_and_upload(
                         redis_client, lock_key, lock_expiration_time
                     )
 
         finally:
-            # Release the lock
             redis_client.delete(lock_key)
     else:
         print(f"Upload task for App: {app_vtex_uuid} is already in progress.")

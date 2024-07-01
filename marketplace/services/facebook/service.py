@@ -118,6 +118,9 @@ class FacebookService:  # TODO: Change the name to CatalogService
         upload_id = self.get_in_process_uploads_by_feed(feed_id)
         return upload_id if upload_id else False
 
+    def get_product_feed_by_catalog(self, product_catalog_id):
+        return self.client.get_product_feed_by_catalog(product_catalog_id)
+
     # ================================
     # Private Methods
     # ================================

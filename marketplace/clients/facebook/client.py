@@ -272,6 +272,12 @@ class CatalogsRequests(FacebookAuthorization, RequestClient, CatalogsRequestsInt
             if "end_time" not in upload:
                 return upload.get("id")
 
+    def get_product_feed_by_catalog(self, catalog_id):
+        url = f"{self.get_url}/{catalog_id}/product_feeds"
+        headers = self._get_headers()
+        response = self.make_request(url, method="GET", headers=headers)
+        return response.json()
+
 
 class TemplatesRequests(
     FacebookAuthorization, RequestClient, TemplatesRequestsInterface
