@@ -14,7 +14,11 @@ class ExcludeAlcoholicDrinks(Rule):
         ALCOHOLIC_DRINKS_CATEGORIES (set): A set of category names that identify alcoholic drinks.
     """
 
-    ALCOHOLIC_DRINKS_CATEGORIES = {"bebida alcoólica", "bebidas alcoólicas", "vinos y licores"}
+    ALCOHOLIC_DRINKS_CATEGORIES = {
+        "bebida alcoólica",
+        "bebidas alcoólicas",
+        "vinos y licores",
+    }
 
     def apply(self, product: FacebookProductDTO, **kwargs) -> bool:
         """

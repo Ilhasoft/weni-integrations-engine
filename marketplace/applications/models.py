@@ -22,6 +22,7 @@ class App(AppTypeBaseModel):
     PLATFORM_WENI_FLOWS = "WF"
     PLATFORM_RC = "RC"
     PLATFORM_VTEX = "VT"
+    PLATFORM_VIP = "VP"
 
     PLATFORM_CHOICES = (
         (PLATFORM_IA, "inteligence-artificial"),

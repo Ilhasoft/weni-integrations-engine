@@ -459,3 +459,9 @@ RAPIDPRO_URL = env.str("RAPIDPRO_URL", "")
 RAPIDPRO_API_TOKEN = env.str("RAPIDPRO_API_TOKEN", "")
 RAPIDPRO_FLOW_GROUP_UUID = env.str("RAPIDPRO_FLOW_GROUP_UUID", "")
 RAPIDPRO_FLOW_UUID = env.str("RAPIDPRO_FLOW_UUID", "")
+
+# SentenX
+SENTENX_URL = env.str("SENTENX_URL", "")
+
+# Vip Commerce URL
+VIP_COMMERCE_URL = env.str("VIPCOMMERCE_URL", default="api-integracao")
