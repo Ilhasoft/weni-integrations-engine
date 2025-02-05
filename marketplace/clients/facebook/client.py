@@ -367,6 +367,16 @@ class TemplatesRequests(
 
         return response.json()
 
+    def create_library_template_message(
+        self, waba_id: str, template_data: dict
+    ) -> dict:
+        url = f"{self.get_url}/{waba_id}/message_templates"
+        response = self.make_request(
+            url, method="POST", json=template_data, headers=self._get_headers()
+        )
+
+        return response
+
     def get_template_analytics(self, waba_id, fields):
         url = f"{self.get_url}/{waba_id}/template_analytics"
         headers = self._get_headers()

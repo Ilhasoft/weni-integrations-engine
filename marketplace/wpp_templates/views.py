@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.generics import get_object_or_404
 
 from marketplace.applications.models import App
 from marketplace.core.types import APPTYPES
@@ -19,6 +20,7 @@ from marketplace.core.types.channels.whatsapp_base.mixins import QueryParamsPars
 from marketplace.services.facebook.service import TemplateService, PhotoAPIService
 from marketplace.clients.facebook.client import FacebookClient
 from marketplace.accounts.permissions import ProjectManagePermission
+from marketplace.clients.exceptions import CustomAPIException
 
 from .models import TemplateHeader, TemplateMessage, TemplateTranslation, TemplateButton
 from .serializers import TemplateMessageSerializer, TemplateTranslationSerializer
@@ -256,3 +258,37 @@ class TemplateMessageViewSet(viewsets.ModelViewSet):
         )
 
         return Response(response)
+
+    @action(detail=False, methods=["POST"])
+    def create_library_templates(self, request, app_uuid=None, uuid=None):
+        """
+        Creates a library template message for the given app.
+
+        Args:
+            request (Request): The request object containing template data.
+            app_uuid (str): UUID of the app.
+            uuid (str, optional): Additional UUID parameter, not used in the function.
+
+        Returns:
+            Response: API response with the template creation status.
+        """
+        app = get_object_or_404(App, uuid=app_uuid)
+
+        try:
+            # Instantiate the template service with a Facebook client
+            template_service = TemplateService(
+                client=FacebookClient(app.apptype.get_system_access_token(app))
+            )
+
+            # Create the template using the provided request data
+            response_data = template_service.create_library_template_message(
+                app=app, template_data=request.data
+            )
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
+
+        except KeyError as e:
+            raise ValidationError(f"Missing configuration: {e}")
+
+        except CustomAPIException as e:
+            return Response({"detail": str(e)}, status=e.status_code)

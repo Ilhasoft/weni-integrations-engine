@@ -61,6 +61,12 @@ class TemplatesRequestsInterface(ABC):
     def delete_template_message(self, waba_id: str, name: str) -> Dict[str, Any]:
         pass
 
+    @abstractmethod
+    def create_library_template_message(
+        self, waba_id: str, template_data: dict
+    ) -> Dict[str, Any]:
+        pass
+
 
 class PhotoAPIRequestsInterface(ABC):
     @abstractmethod

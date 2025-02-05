@@ -4,6 +4,7 @@ import requests
 
 from typing import List, Dict, Any
 
+from marketplace.applications.models import App
 from marketplace.wpp_products.models import Catalog
 from marketplace.interfaces.facebook.interfaces import (
     TemplatesRequestsInterface,
@@ -250,6 +251,17 @@ class TemplateService:
         # Replace non-breaking spaces with normal spaces
         text = text.replace("\xa0", " ")
         return text.strip()
+
+    def create_library_template_message(
+        self,
+        app: App,
+        template_data: dict,
+    ) -> Dict[str, Any]:
+        waba_id = app.config["wa_waba_id"]
+        return self.client.create_library_template_message(
+            waba_id=waba_id,
+            template_data=template_data,
+        )
 
 
 class PhotoAPIService:
