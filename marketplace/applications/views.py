@@ -4,12 +4,14 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import views
 
 from marketplace.applications.serializers import AppTypeSerializer, MyAppSerializer
 from marketplace.core import types
 from marketplace.applications.models import App, AppTypeFeatured
 from marketplace.accounts.models import ProjectAuthorization
 from marketplace.accounts.permissions import is_crm_user
+from marketplace.internal.permissions import CanCommunicateInternally
 
 
 class AppTypeViewSet(viewsets.ViewSet):
@@ -98,3 +100,36 @@ class MyAppViewSet(viewsets.ReadOnlyModelViewSet):
                 )
 
         return queryset
+
+
+class CheckAppIsIntegrated(views.APIView):
+
+    permission_classes = [CanCommunicateInternally]
+
+    def get(self, request):
+        project_uuid = request.query_params.get("project_uuid", None)
+
+        if not project_uuid:
+            return Response({"error": "project_uuid is required on query params"}, status=status.HTTP_400_BAD_REQUEST)
+
+        apps = App.objects.filter(code="wpp-cloud", project_uuid=project_uuid)
+
+        if not apps.exists():
+            return Response({
+                "message": "Project with whatsapp integrations not exists",
+                "data": {
+                    "has_whatsapp": False
+                }
+            })
+
+        app = apps.first()
+
+        return Response(
+                {
+                    "message": "Project with whatsapp integrations exists",
+                    "data": {
+                        "has_whatsapp": True,
+                        "wpp_cloud_app_uuid": str(app.uuid),
+                        "flows_channel_uuid": str(app.flow_object_uuid)
+                    }
+                }, status=status.HTTP_200_OK)
